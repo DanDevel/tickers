@@ -1,0 +1,949 @@
+from bs4 import BeautifulSoup
+import urllib3
+#import urllib.parse
+#import urllib.request
+import json
+import sys, locale
+import certifi
+import time 
+import os
+#import ptvsd
+from pymongo import MongoClient, errors
+import requests
+import pprint
+from pathlib import Path
+from flask_cors import CORS
+from flask import Blueprint
+from flask import Flask, session, render_template, request, redirect, url_for, jsonify, escape
+from flask_socketio import SocketIO
+from flask_socketio import send, emit
+from werkzeug.exceptions import HTTPException
+
+
+
+all_tickers_btc_usdt = Flask(__name__)
+CORS(all_tickers_btc_usdt)
+all_tickers_btc_usdt.secret_key = os.urandom(24) # b'5#y2L"F4Q8zfxpppxex]/'
+#pasta_local_templates = str(Path(__file__).parent.absolute()) + '\\Templates' 
+#pasta_local_imgs = str(Path(__file__).parent.absolute()) + '\\imgs' 
+all_tickers_btc_usdt = Blueprint('all_tickers_btc_usdt',__name__, url_prefix="/all_tickers_btc_usdt")
+
+http = urllib3.PoolManager(cert_reqs='CERT_REQUIRED',ca_certs=certifi.where())
+
+
+#def poloniex_ticker(http):
+#    url = "https://poloniex.com/public?command=returnTicker"
+#    r = http.request('GET', url)
+#    myData = json.loads(r.data.decode('utf-8'))
+#    #print(myData['USDT_BTC']['last'])
+#
+#    #tether
+#    last_usdt_btc = myData['USDT_BTC']['last'] # bitcoin
+#    last_usdt_ltc = myData['USDT_LTC']['last'] # litecoin
+#    last_usdt_str = myData['USDT_STR']['last'] # stellar
+#    last_usdt_xrp = myData['USDT_XRP']['last'] # ripple
+#    last_usdt_xmr = myData['USDT_XMR']['last'] # monero
+#    last_usdt_eth = myData['USDT_ETH']['last'] # ethereum
+#    #bitcoin
+#    last_btc_ltc = myData['BTC_LTC']['last']
+#    last_btc_str = myData['BTC_STR']['last']
+#    last_btc_xrp = myData['BTC_XRP']['last']
+#    last_btc_xmr = myData['BTC_XMR']['last']
+#    last_btc_eth = myData['BTC_ETH']['last']
+#    #circle
+#    last_usdc_btc = myData['USDC_BTC']['last']
+#    last_usdc_eth = myData['USDC_ETH']['last']
+#    last_usdc_xrp = myData['USDC_XRP']['last']
+#    last_usdc_usdt = myData['USDC_USDT']['last']
+#    last_usdc_str = myData['USDC_STR']['last']
+#    last_usdc_ltc = myData['USDC_LTC']['last']#
+#
+#    poloniex_wallet = [{
+#        'USDT_BTC':last_usdt_btc, 
+#        'USDT_LTC':last_usdt_ltc,
+#        'USDT_STR':last_usdt_str,
+#        'USDT_XRP':last_usdt_xrp,
+#        'USDT_XMR':last_usdt_xmr,
+#        'USDT_ETH':last_usdt_eth,
+#        'BTC_LTC':last_btc_ltc,
+#        'BTC_STR':last_btc_str,
+#        'BTC_XRP':last_btc_xrp,
+#        'BTC_XMR':last_btc_xmr,
+#        'BTC_ETH':last_btc_eth,
+#        'USDC_BTC':last_usdc_btc,
+#        'USDC_ETH':last_usdc_eth,
+#        'USDC_XRP':last_usdc_xrp,
+#        'USDC_USDT':last_usdc_usdt,
+#        'USDC_STR':last_usdc_str,
+#        'USDC_LTC':last_usdc_ltc
+#    }]
+#
+#    mongo = MongoClient()
+#    mongo = MongoClient('mongodb://i-dani001:I-dani-003-31@mydb-shard-00-00-fi8tq.mongodb.net:27017,mydb-shard-00-01-fi8tq.mongodb.net:27017,mydb-shard-00-02-fi8tq.mongodb.net:27017/test?ssl=true&replicaSet=MyDB-shard-0&authSource=admin&retryWrites=true')
+#    db = mongo['MyCad']
+#    db_prices = db['prices']#
+#
+#    import datetime    
+#    data_cadastro = datetime.date.today()
+#    data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+#    db_prices.insert_one({'poloniex' :poloniex_wallet, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+#
+#    return poloniex_wallet
+
+
+
+
+def string_timestamp_data_cadastro(data_string):
+    import datetime
+    return datetime.datetime.strptime(str(data_string), "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc).timestamp()
+
+    
+# https://api.binance.com/api/v3/ticker/price
+
+
+def binance_market(http):
+    url = "https://api.binance.com/api/v3/ticker/price"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData)
+    for dados in myData:
+        symbol = dados['symbol']
+        price = dados['price']
+        if symbol == 'BTCUSDT':
+            last_btc = price
+
+    #last_btc = myData['last'] 
+
+    return last_btc
+
+
+
+def hitbtc_market(http):
+    # url = "https://api.hitbtc.com/api/2/public/symbol"  
+    url = "https://api.hitbtc.com/api/2/public/ticker/btcusdc"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['USDT_BTC']['last'])
+    last_btc = myData['last'] 
+
+    return last_btc
+
+
+
+
+def poloniex_market(http):
+    url = "https://poloniex.com/public?command=returnTicker"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['USDT_BTC']['last'])
+    last_btc = myData['USDT_BTC']['last'] 
+    last_usdc = myData['USDC_USDT']['last'] 
+    #print('last_btc')
+    #print(last_btc)
+    #print('last_USDC')
+    #print(last_usdc)
+
+    return last_btc, last_usdc
+
+#poloniex_market(http)
+
+
+
+def poloniex_ticker(http):
+    print('poloniex_ticker...')
+    url = "https://poloniex.com/public?command=returnTicker"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['USDT_BTC']['last'])
+    last_btc = myData['USDT_BTC']['last'] 
+    last_usdc = myData['USDC_USDT']['last'] 
+    #print('last_btc')
+    #print(last_btc)
+    #print('last_USDC')
+    #print(last_usdc)
+
+    return r.data.decode('utf-8')
+
+
+def okcoin_market(http):
+    url = "https://www.okcoin.com/api/v1/ticker.do?symbol=btc_usd"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['ticker']['last'])
+    last_btc = myData['ticker']['last'] 
+    return last_btc
+
+
+
+
+def mercadobitcoin_market(http):
+    url = "https://www.mercadobitcoin.net/api/BTC/ticker/"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['ticker']['last'])
+    last_btc = myData['ticker']['last']
+    return last_btc
+
+
+
+def bitcambio_market(http):
+    url = "https://bitcambio_api.blinktrade.com/api/v1/BRL/ticker"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['last'])
+    last_btc = myData['last']
+    return last_btc
+
+
+
+def braziliex_market(http):
+    url = "https://braziliex.com/api/v1/public/ticker"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['btc_brl']['last'])
+    last_btc = myData['btc_brl']['last']
+    return last_btc
+
+
+def quadrigacx_market(http):
+    url = "https://api.quadrigacx.com/v2/ticker?book=btc_usd"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['last'])
+    last_btc = myData['last']
+    return last_btc
+
+
+def blockchainluxemburgo_market(http):
+    url = "https://blockchain.info/q/24hrprice"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData)
+    last_btc = myData
+    return last_btc
+
+
+def bitstamp_btcusd_market(http):
+    url = "https://www.bitstamp.net/api/v2/ticker_hour/btcusd/"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['last'])
+    last_btc = myData['last']
+    return last_btc
+
+# https://api.kraken.com/0/public/Ticker?pair=XXBTZUSD
+
+def kraken_btcusd_market(http):
+    url = "https://api.kraken.com/0/public/Ticker?pair=xbtusd"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['result']['XXBTZUSD']['c'][0])
+    last_btc = myData['result']['XXBTZUSD']['c'][0] 
+    return last_btc
+
+#kraken_btcusd_market(http)
+
+def bittrex_btcusd_market(http):
+    url = "https://api.bittrex.com/api/v1.1/public/getticker?market=USD-BTC"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['result']['Last'])
+    last_btc = myData['result']['Last'] 
+    return last_btc
+
+#bittrex_btcusd_market(http)
+
+# https://cex.io/api/ticker/BTC/USD
+
+def cex_btcusd_market(http):
+    url = "https://cex.io/api/ticker/BTC/USD"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['last'])
+    last_btc = myData['last'] 
+    return last_btc
+
+# cex_btcusd_market(http)
+
+# https://api.gemini.com/v1/pubticker/btcusd
+
+def gemini_btcusd_market(http):
+    url = "https://api.gemini.com/v1/pubticker/btcusd"
+    r = http.request('GET', url)
+    myData = json.loads(r.data.decode('utf-8'))
+    #print(myData['last'])
+    last_btc = myData['last'] 
+    return last_btc
+
+
+
+def dolar_yahoo_financas(http):
+    #url = "https://www.bcb.gov.br/acessoinformacao/legado?url=https:%2F%2Fwww4.bcb.gov.br%2Fpec%2Ftaxas%2Fbatch%2Ftaxas.asp%3Fid%3Dtxdolar"
+    #r = http.request('GET', url)
+    #myData = json.loads(r.data.decode('utf-8'))
+    #print(r.data)
+    #print('')
+    url = "https://br.financas.yahoo.com/quote/USDBRL=X/"
+    page = requests.get(url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    #print(soup.prettify())
+
+    #string_chave = "PREV_CLOSE-value" # data-reactid="34"
+    string_chave = "PREV_CLOSE-value"
+    for link in soup.find_all('td', attrs={"class":"Ta(end) Fw(600) Lh(14px)"}):
+        #print(link)
+        if string_chave in str(link):
+            #print('dolar encontrado')
+            #print(str(link)[129:-12])
+            valor_dolar = str(link)[129:-12]
+            return valor_dolar
+            
+
+#yahoo_dolar = dolar_yahoo_financas(http)
+
+
+
+def start_local(dolar):    
+    #print("mercados:")
+    '''
+    mongo = MongoClient()
+    mongo = MongoClient('mongodb://i-dani001:I-dani-003-31@mydb-shard-00-00-fi8tq.mongodb.net:27017,mydb-shard-00-01-fi8tq.mongodb.net:27017,mydb-shard-00-02-fi8tq.mongodb.net:27017/test?ssl=true&replicaSet=MyDB-shard-0&authSource=admin&retryWrites=true')
+    db = mongo['MyCad']
+    db_prices_local = db['hb_prices'] # ultimos valores
+    '''
+    ''''''
+    mongo2 = MongoClient()
+    mongo2 = MongoClient('127.0.0.1:27017')
+    db2 = mongo2['db']
+    db_prices_local = db2['prices']
+    
+    markets = [{}]
+
+    try:    
+        #print("kraken_market")
+        valor_btc = binance_market(http)
+        for item in markets:
+            item['binance'] = round(float(valor_btc), 2)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'poloniex' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+
+
+    except Exception as er:
+        for item in markets:
+            item['binance'] = 0
+        print("erro na binance api")
+        pass
+
+
+    try:    
+        #print("poloniex_market")
+        valor_btc = binance_market(http)
+
+        for item in markets:
+            item['binance'] = round(float(valor_btc), 2)
+
+    except Exception as er:
+        for item in markets:
+            item['binance'] = 0
+
+        print("erro na binance api: " + str(er))
+        pass
+
+
+
+    try:    
+        #print("poloniex_market")
+        valor_btc = hitbtc_market(http)
+
+        for item in markets:
+            item['hitbtc'] = round(float(valor_btc), 2)
+
+    except Exception as er:
+        for item in markets:
+            item['hitbtc'] = 0
+
+        print("erro na hitbtc api: " + str(er))
+        pass
+
+
+
+    try:    
+        #print("poloniex_market")
+        valor_btc, valor_usdt = poloniex_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'poloniex' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['poloniex'] = round(float(valor_btc), 2)
+            item['poloniex_usdt'] = round(float(valor_usdt), 8)
+
+    except Exception as er:
+        for item in markets:
+            item['poloniex'] = 0
+            item['poloniex_usdt'] = 0
+
+        print("erro na poloniex_market api: " + str(er))
+        pass
+
+
+    try:    
+        #print("kraken_market")
+        valor_btc = kraken_btcusd_market(http)
+        for item in markets:
+            item['kraken'] = round(float(valor_btc), 2)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'poloniex' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+
+
+    except Exception as er:
+        for item in markets:
+            item['kraken'] = 0
+        print("erro na kraken_market api: " + str(er))
+        pass
+
+
+    try:    
+        #print("okcoin_market")
+        valor_btc = okcoin_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'okcoin' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['okcoin'] = round(float(valor_btc), 2)        
+
+    except Exception as er:
+        for item in markets:
+            item['okcoin'] = 0
+        print("erro na okcoin_market api: " + str(er))
+        pass
+
+    try:
+        #print("mercadobitcoin_market")
+        valor_btc_brl = mercadobitcoin_market(http)
+        valor_btc_dolar = dolar
+        #print('dolar: ' + str(valor_btc_dolar))
+        valor2 = str(valor_btc_dolar)[0]
+        valor3 = str(valor_btc_dolar)[2:]
+        dolar_atualizado = str(valor2)+"."+str(valor3)
+        #print(dolar_atualizado)
+        btc_dolar = float(valor_btc_brl) / float(dolar_atualizado)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'mercado bitcoin' : valor_btc, 'mercado bitcoin usd' : btc_dolar, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['mercado btc'] = round(float(btc_dolar), 2)
+
+    except Exception as er:
+        for item in markets:
+            item['mercado btc'] = 0
+        print("erro na mercadobitcoin_market api: " + str(er))
+        pass
+
+    try:    
+        #print("bitcambio_market")
+        valor_btc = bitcambio_market(http)
+        valor_btc_dolar = dolar
+        valor2 = str(valor_btc_dolar)[0]
+        valor3 = str(valor_btc_dolar)[2:]
+        dolar_atualizado = str(valor2)+"."+str(valor3)
+        btc_dolar = float(valor_btc) / float(dolar_atualizado)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitcambio' : valor_btc, 'bitcambio usd' : btc_dolar,  'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['bitcambio'] = round(float(btc_dolar), 2)
+
+    except Exception as er:
+        for item in markets:
+            item['bitcambio'] = 0
+        print("erro na bitcambio_market api: " + str(er))
+        pass
+
+    try:    
+        #print("braziliex_market")
+        valor_btc = braziliex_market(http)
+        valor_btc_dolar = dolar
+        valor2 = str(valor_btc_dolar)[0]
+        valor3 = str(valor_btc_dolar)[2:]
+        dolar_atualizado = str(valor2)+"."+str(valor3)
+        btc_dolar = float(valor_btc) / float(dolar_atualizado)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'braziliex' : valor_btc, 'braziliex usd' : btc_dolar, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['braziliex'] = round(float(btc_dolar), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['braziliex'] = 0
+        print("erro na braziliex_market api: " + str(er))
+        pass
+    
+
+    #try:    
+    #    print("quadrigacx_market")
+    #    valor_btc = quadrigacx_market(http)
+    #    import datetime    
+    #    data_cadastro = datetime.date.today()
+    #    data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+    #    markets.append({'quadrigacx' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+    #    for item in markets:
+    #        item['quadrigacx'] = valor_btc
+
+
+    #except Exception as er:
+    #    print("erro na quadrigacx_market api")
+    #    pass
+
+
+    try:
+        #print("blockchainluxemburgo_market")
+        valor_btc = blockchainluxemburgo_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'blockchain luxemburgo' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['blockchain'] = round(float(valor_btc), 2)    
+    
+    except Exception as er:
+        for item in markets:
+            item['blockchain'] = 0
+        print("erro na blockchainluxemburgo_market api: " + str(er))
+        pass
+
+    try:
+        #print("bitstamp_btcusd_market")
+        valor_btc = bitstamp_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['bitstamp'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['bitstamp'] = 0
+        print("erro na bitstamp_btcusd_market api: " + str(er))    
+        pass    
+
+
+    # https://api.bittrex.com/api/v1.1/public/getticker?market=USD-BTC
+
+    try:
+        #print("bittrex_btcusd_market")
+        valor_btc = bittrex_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['bittrex'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['bittrex'] = 0
+        print("erro na bittrex_btcusd_market api: " + str(er))    
+        pass    
+
+
+
+    try:
+        #print("cex_btcusd_market")
+        valor_btc = cex_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['cex'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['cex'] = 0
+        print("erro na cex_btcusd_market api")    
+        pass    
+
+    # https://api.gemini.com/v1/pubticker/btcusd
+
+    try:
+        #print("gemini_btcusd_market")
+        valor_btc = gemini_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['gemini'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['gemini'] = 0 
+        print("erro na gemini_btcusd_market api")    
+        pass    
+
+
+    ''''''
+    try:
+        # db web
+        for dados in db_prices_local.find():
+            #print('dados===')
+            #print(dados)
+            id_dados = str(dados['_id'])
+            #print('id localizado==============')
+            #print(id_dados)
+            if id_dados == "5d0e5808217f8cd0c4995071":
+                db_prices_local.update_one({'_id':"5d0e5808217f8cd0c4995071"}, { '$set': { 'btc_markets.0.poloniex_usdt': markets[0]['poloniex_usdt'] ,'btc_markets.0.poloniex': markets[0]['poloniex'] , 'btc_markets.0.kraken': markets[0]['kraken'] ,'btc_markets.0.okcoin': markets[0]['okcoin'] ,'btc_markets.0.mercado btc': markets[0]['mercado btc'],'btc_markets.0.bitcambio': markets[0]['bitcambio'],'btc_markets.0.braziliex': markets[0]['braziliex'],'btc_markets.0.blockchain': markets[0]['blockchain'],'btc_markets.0.bitstamp': markets[0]['bitstamp'],'btc_markets.0.bittrex': markets[0]['bittrex'],'btc_markets.0.cex': markets[0]['cex'],'btc_markets.0.gemini': markets[0]['gemini'],'btc_markets.0.binance': markets[0]['binance'],'btc_markets.0.hitbtc': markets[0]['hitbtc']}}, True)                                                        
+                print('markets local cadastrados')
+            
+    except Exception as er:
+        pass
+    
+
+    try:
+        #pp = pprint.PrettyPrinter(indent=4)
+        #pp.pprint(markets)
+
+        return markets
+
+
+    except Exception as er:
+        pass
+        print('erro em return markets start_local...' + str(er))
+        return '400'
+
+
+
+
+
+def start_remoto(dolar):    
+    #print("mercados:")
+    
+    mongo = MongoClient()
+    mongo = MongoClient('mongodb://i-dani001:I-dani-003-31@mydb-shard-00-00-fi8tq.mongodb.net:27017,mydb-shard-00-01-fi8tq.mongodb.net:27017,mydb-shard-00-02-fi8tq.mongodb.net:27017/test?ssl=true&replicaSet=MyDB-shard-0&authSource=admin&retryWrites=true')
+    db = mongo['MyCad']
+    db_prices_local = db['hb_prices'] # ultimos valores
+
+    '''
+    mongo2 = MongoClient()
+    mongo2 = MongoClient('127.0.0.1:27017')
+    db2 = mongo2['db']
+    db_prices_local = db2['prices']
+    '''
+
+    markets = [{}]
+
+    try:    
+        #print("kraken_market")
+        valor_btc = binance_market(http)
+        for item in markets:
+            item['binance'] = round(float(valor_btc), 2)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'poloniex' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+
+
+    except Exception as er:
+        for item in markets:
+            item['binance'] = 0
+        print("erro na binance api: " +str(er))
+        pass
+
+
+    try:    
+        #print("poloniex_market")
+        valor_btc, valor_usdt = poloniex_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'poloniex' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['poloniex'] = round(float(valor_btc), 2)
+            item['poloniex_usdt'] = round(float(valor_usdt), 8)
+
+    except Exception as er:
+        for item in markets:
+            item['poloniex'] = 0
+            item['poloniex_usdt'] = 0
+
+        print("erro na poloniex_market api: " +str(er))
+        pass
+
+
+    try:    
+        #print("kraken_market")
+        valor_btc = kraken_btcusd_market(http)
+        for item in markets:
+            item['kraken'] = round(float(valor_btc), 2)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'poloniex' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+
+
+    except Exception as er:
+        for item in markets:
+            item['kraken'] = 0
+        print("erro na kraken_market api: " +str(er))
+        pass
+
+
+    try:    
+        #print("okcoin_market")
+        valor_btc = okcoin_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'okcoin' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['okcoin'] = round(float(valor_btc), 2)        
+
+    except Exception as er:
+        for item in markets:
+            item['okcoin'] = 0
+        print("erro na okcoin_market api: " +str(er))
+        pass
+
+    try:
+        #print("mercadobitcoin_market")
+        valor_btc_brl = mercadobitcoin_market(http)
+        valor_btc_dolar = dolar
+        #print('dolar: ' + str(valor_btc_dolar))
+        valor2 = str(valor_btc_dolar)[0]
+        valor3 = str(valor_btc_dolar)[2:]
+        dolar_atualizado = str(valor2)+"."+str(valor3)
+        #print(dolar_atualizado)
+        btc_dolar = float(valor_btc_brl) / float(dolar_atualizado)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'mercado bitcoin' : valor_btc, 'mercado bitcoin usd' : btc_dolar, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['mercado btc'] = round(float(btc_dolar), 2)
+
+    except Exception as er:
+        for item in markets:
+            item['mercado btc'] = 0
+        print("erro na mercadobitcoin_market api: " +str(er))
+        pass
+
+    try:    
+        #print("bitcambio_market")
+        valor_btc = bitcambio_market(http)
+        valor_btc_dolar = dolar
+        valor2 = str(valor_btc_dolar)[0]
+        valor3 = str(valor_btc_dolar)[2:]
+        dolar_atualizado = str(valor2)+"."+str(valor3)
+        btc_dolar = float(valor_btc) / float(dolar_atualizado)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitcambio' : valor_btc, 'bitcambio usd' : btc_dolar,  'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['bitcambio'] = round(float(btc_dolar), 2)
+
+    except Exception as er:
+        for item in markets:
+            item['bitcambio'] = 0
+        print("erro na bitcambio_market api: " +str(er))
+        pass
+
+    try:    
+        #print("braziliex_market")
+        valor_btc = braziliex_market(http)
+        valor_btc_dolar = dolar
+        valor2 = str(valor_btc_dolar)[0]
+        valor3 = str(valor_btc_dolar)[2:]
+        dolar_atualizado = str(valor2)+"."+str(valor3)
+        btc_dolar = float(valor_btc) / float(dolar_atualizado)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'braziliex' : valor_btc, 'braziliex usd' : btc_dolar, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['braziliex'] = round(float(btc_dolar), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['braziliex'] = 0
+        print("erro na braziliex_market api: " +str(er))
+        pass
+    
+
+    #try:    
+    #    print("quadrigacx_market")
+    #    valor_btc = quadrigacx_market(http)
+    #    import datetime    
+    #    data_cadastro = datetime.date.today()
+    #    data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+    #    markets.append({'quadrigacx' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+    #    for item in markets:
+    #        item['quadrigacx'] = valor_btc
+
+
+    #except Exception as er:
+    #    print("erro na quadrigacx_market api")
+    #    pass
+
+
+    try:
+        #print("blockchainluxemburgo_market")
+        valor_btc = blockchainluxemburgo_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'blockchain luxemburgo' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['blockchain'] = round(float(valor_btc), 2)    
+    
+    except Exception as er:
+        for item in markets:
+            item['blockchain'] = 0
+        print("erro na blockchainluxemburgo_market api: " +str(er))
+        pass
+
+    try:
+        #print("bitstamp_btcusd_market")
+        valor_btc = bitstamp_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['bitstamp'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['bitstamp'] = 0
+        print("erro na bitstamp_btcusd_market api: " +str(er))    
+        pass    
+
+
+    # https://api.bittrex.com/api/v1.1/public/getticker?market=USD-BTC
+
+    try:
+        #print("bittrex_btcusd_market")
+        valor_btc = bittrex_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['bittrex'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['bittrex'] = 0
+        print("erro na bittrex_btcusd_market api: " +str(er))    
+        pass    
+
+
+
+    try:
+        #print("cex_btcusd_market")
+        valor_btc = cex_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['cex'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['cex'] = 0
+        print("erro na cex_btcusd_market api: " +str(er))    
+        pass    
+
+    # https://api.gemini.com/v1/pubticker/btcusd
+
+    try:
+        #print("gemini_btcusd_market")
+        valor_btc = gemini_btcusd_market(http)
+        #import datetime    
+        #data_cadastro = datetime.date.today()
+        #data_timestamp = string_timestamp_data_cadastro(data_cadastro)
+        #markets.append({'bitstamp' : valor_btc, 'data':str(data_cadastro), 'data_ts':data_timestamp})
+        for item in markets:
+            item['gemini'] = round(float(valor_btc), 2)        
+        
+
+    except Exception as er:
+        for item in markets:
+            item['gemini'] = 0 
+        print("erro na gemini_btcusd_market api: " +str(er))    
+        pass    
+
+
+
+    try:
+        # db web
+        for dados in db_prices_local.find():
+            #print('dados===')
+            #print(dados)
+            id_dados = str(dados['_id'])
+            #print('id localizado==============')
+            #print(id_dados)
+            if id_dados == "5d0e5808217f8cd0c4995071":
+                db_prices_local.update_one({'_id':"5d0e5808217f8cd0c4995071"}, { '$set': { 'btc_markets.0.poloniex_usdt': markets[0]['poloniex_usdt'] ,'btc_markets.0.poloniex': markets[0]['poloniex'] , 'btc_markets.0.kraken': markets[0]['kraken'] ,'btc_markets.0.okcoin': markets[0]['okcoin'] ,'btc_markets.0.mercado btc': markets[0]['mercado btc'],'btc_markets.0.bitcambio': markets[0]['bitcambio'],'btc_markets.0.braziliex': markets[0]['braziliex'],'btc_markets.0.blockchain': markets[0]['blockchain'],'btc_markets.0.bitstamp': markets[0]['bitstamp'],'btc_markets.0.bittrex': markets[0]['bittrex'],'btc_markets.0.cex': markets[0]['cex'],'btc_markets.0.gemini': markets[0]['gemini'],'btc_markets.0.binance': markets[0]['binance']}}, True)                                       
+                print('markets remoto cadastrados')
+            
+    except Exception as er:
+        pass
+        print('erro em update_one: ' + str(er))
+
+
+
+'''
+# executa a ccada 5 minutos no gcloud
+while True: 
+    start_remoto(yahoo_dolar) 
+    time.sleep(300)
+'''
+
+#from home_broker import *
+
+#lista_exchanges = start_local(yahoo_dolar) 
+
+
+#yahoo_dolar = dolar_yahoo_financas(http)
+
+#start_remoto(yahoo_dolar) 
+
+#start_local(yahoo_dolar) 
+
+'''
+while True:
+    yahoo_dolar = dolar_yahoo_financas(http)
+    start_remoto(yahoo_dolar) 
+    start_local(yahoo_dolar)     
+    print('markets local, remoto atualizados... all_tickers_btc_usdt...')
+    time.sleep(360)
+
+'''
+
+'''
+yahoo_dolar = dolar_yahoo_financas(http)
+start_remoto(yahoo_dolar) 
+start_local(yahoo_dolar)     
+'''
